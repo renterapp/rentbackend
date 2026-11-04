@@ -61,7 +61,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
 };
 
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', ...swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+app.use('/api-docs', ...swaggerUi.serve as any, swaggerUi.setup(swaggerDocs));
 
 // Mount API routes
 app.use('/api/auth', authRouter);
