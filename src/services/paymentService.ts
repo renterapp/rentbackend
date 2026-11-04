@@ -130,10 +130,31 @@ export class PaymentService {
       if (rentChargeId) {
         // Specific charge targeted
         const singleCharge = await tx.tsmib_rent_charges.findFirst({
-          where: { id: rentChargeId, organization_id: organizationId },
+          where: {
+            id: rentChargeId,
+            organization_id: organizationId,
+            apartment_id: apartmentId,
+            tsmib_leases: {
+              tsmib_lease_tenants: { some: { tenant_id: tenantId } },
+            },
+          },
           include: { tsmib_payment_allocations: true, tsmib_rent_status: true },
         });
-        if (singleCharge) targetCharges = [singleCharge];
+        if (!singleCharge) {
+          throw new Error('Rent charge was not found for this tenant and apartment.');
+        }
+        if (!['PENDING', 'OVERDUE', 'PARTIALLY_PAID'].includes(singleCharge.tsmib_rent_status.code)) {
+          throw new Error('Payment cannot be allocated to a paid or cancelled rent charge.');
+        }
+        const alreadyPaid = singleCharge.tsmib_payment_allocations.reduce(
+          (sum: number, allocation: any) => sum + Number(allocation.amount),
+          0,
+        );
+        const chargeTotal = Number(singleCharge.total_amount || singleCharge.rent_amount);
+        if (amount > Math.max(0, chargeTotal - alreadyPaid)) {
+          throw new Error('Payment amount exceeds the remaining balance on this rent charge.');
+        }
+        targetCharges = [singleCharge];
       } else if (autoAllocate) {
         // Chronological allocation (oldest unpaid charges first)
         targetCharges = await tx.tsmib_rent_charges.findMany({

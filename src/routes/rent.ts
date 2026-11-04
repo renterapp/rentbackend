@@ -26,6 +26,18 @@ const recordPaymentSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+const updateRentChargeSchema = z.object({
+  dueDate: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Due date must use YYYY-MM-DD')
+    .refine((value) => {
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    }, 'Due date is invalid')
+    .optional(),
+  rentAmount: z.number().positive().optional(),
+  lateFee: z.number().nonnegative().optional(),
+}).refine((data) => Object.keys(data).length > 0, 'At least one charge field must be updated');
+
 // 1. GET rent status lookups
 router.get('/meta/lookups', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -67,7 +79,11 @@ router.get('/charges', requireAuth, async (req: AuthenticatedRequest, res: Respo
       where,
       include: {
         tsmib_apartments: {
-          include: { tsmib_buildings: true },
+          include: {
+            tsmib_buildings: {
+              include: { tsmib_properties: { select: { id: true, name: true } } },
+            },
+          },
         },
         tsmib_rent_status: true,
         tsmib_leases: {
@@ -78,7 +94,17 @@ router.get('/charges', requireAuth, async (req: AuthenticatedRequest, res: Respo
             },
           },
         },
-        tsmib_payment_allocations: true,
+        tsmib_payment_allocations: {
+          include: {
+            tsmib_payments: {
+              include: {
+                tsmib_payment_method: true,
+                tsmib_payment_receipts: true,
+              },
+            },
+          },
+          orderBy: { created_at: 'desc' },
+        },
       },
       orderBy: [{ billing_year: 'desc' }, { billing_month: 'desc' }, { due_date: 'asc' }],
     });
@@ -86,12 +112,16 @@ router.get('/charges', requireAuth, async (req: AuthenticatedRequest, res: Respo
     const response = charges.map((c) => {
       const primaryTenant = c.tsmib_leases.tsmib_lease_tenants[0]?.tsmib_tenants;
       const totalPaid = c.tsmib_payment_allocations.reduce((sum, a) => sum + Number(a.amount), 0);
-      const totalCharge = Number(c.total_amount || c.rent_amount);
+      const totalCharge = Number(c.rent_amount) + Number(c.late_fee || 0);
 
       return {
         id: c.id,
         leaseId: c.lease_id,
         apartmentId: c.apartment_id,
+        tenantId: primaryTenant?.id ?? null,
+        propertyId: c.tsmib_apartments.tsmib_buildings.tsmib_properties.id,
+        propertyName: c.tsmib_apartments.tsmib_buildings.tsmib_properties.name,
+        buildingId: c.tsmib_apartments.tsmib_buildings.id,
         apartmentNumber: c.tsmib_apartments.apartment_number,
         buildingName: c.tsmib_apartments.tsmib_buildings.name,
         tenantName: primaryTenant ? `${primaryTenant.first_name} ${primaryTenant.last_name || ''}`.trim() : 'Unknown',
@@ -106,12 +136,89 @@ router.get('/charges', requireAuth, async (req: AuthenticatedRequest, res: Respo
         pendingAmount: Math.max(0, totalCharge - totalPaid),
         status: c.tsmib_rent_status.code,
         statusName: c.tsmib_rent_status.name,
+        payments: c.tsmib_payment_allocations.map((allocation) => ({
+          id: allocation.tsmib_payments.id,
+          amount: Number(allocation.amount),
+          paymentAmount: Number(allocation.tsmib_payments.amount),
+          paymentReference: allocation.tsmib_payments.payment_reference,
+          paymentDate: allocation.tsmib_payments.payment_date,
+          method: allocation.tsmib_payments.tsmib_payment_method.name,
+          transactionId: allocation.tsmib_payments.transaction_id,
+          receiptNumber: allocation.tsmib_payments.tsmib_payment_receipts[0]?.receipt_number ?? null,
+        })),
       };
     });
 
     res.json(response);
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Failed to list charges' });
+  }
+});
+
+// Update a charge's amount and due date without changing its payment-derived status.
+router.patch('/charges/:id', requireAuth, requireRole(['OWNER', 'MANAGER', 'ADMIN']), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const orgId = req.user!.organizationId;
+    const data = updateRentChargeSchema.parse(req.body);
+    const charge = await prisma.tsmib_rent_charges.findFirst({
+      where: { id: req.params.id, organization_id: orgId },
+      include: { tsmib_payment_allocations: true, tsmib_rent_status: true },
+    });
+    if (!charge) return res.status(404).json({ error: 'Rent charge not found' });
+    if (charge.tsmib_rent_status.code === 'CANCELLED' || charge.tsmib_rent_status.code === 'PAID') {
+      return res.status(409).json({ error: 'Paid or cancelled rent charges cannot be edited.' });
+    }
+
+    const rentAmount = data.rentAmount ?? Number(charge.rent_amount);
+    const lateFee = data.lateFee ?? Number(charge.late_fee || 0);
+    const totalAmount = rentAmount + lateFee;
+    const paidAmount = charge.tsmib_payment_allocations.reduce((sum, allocation) => sum + Number(allocation.amount), 0);
+    if (totalAmount < paidAmount) {
+      return res.status(400).json({ error: 'Charge total cannot be less than the amount already paid.' });
+    }
+
+    const updated = await prisma.tsmib_rent_charges.update({
+      where: { id: charge.id },
+      data: {
+        ...(data.dueDate ? { due_date: new Date(`${data.dueDate}T00:00:00.000Z`) } : {}),
+        rent_amount: rentAmount as any,
+        late_fee: lateFee as any,
+        updated_at: new Date(),
+      },
+    });
+    const persisted = await prisma.tsmib_rent_charges.findFirst({
+      where: { id: updated.id, organization_id: orgId },
+      select: { id: true, due_date: true, rent_amount: true, late_fee: true, total_amount: true },
+    });
+    if (!persisted) return res.status(500).json({ error: 'Updated rent charge could not be read back.' });
+    const persistedRentAmount = Number(persisted.rent_amount);
+    const persistedLateFee = Number(persisted.late_fee || 0);
+    const persistedTotal = persistedRentAmount + persistedLateFee;
+    if (
+      persistedRentAmount !== rentAmount
+      || persistedLateFee !== lateFee
+      || (data.dueDate && persisted.due_date.toISOString().slice(0, 10) !== data.dueDate)
+    ) {
+      return res.status(500).json({ error: 'Updated rent charge values did not persist as requested.' });
+    }
+    res.json({
+      message: 'Rent charge updated successfully',
+      charge: {
+        id: persisted.id,
+        dueDate: persisted.due_date,
+        rentAmount: persistedRentAmount,
+        lateFee: persistedLateFee,
+        totalAmount: persistedTotal,
+        paidAmount,
+        pendingAmount: Math.max(0, persistedTotal - paidAmount),
+        status: charge.tsmib_rent_status.code,
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    res.status(500).json({ error: error.message || 'Failed to update rent charge' });
   }
 });
 

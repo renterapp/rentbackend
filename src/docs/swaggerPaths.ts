@@ -502,6 +502,36 @@ export const swaggerPaths = {
       },
     },
   },
+  '/api/rent/charges/{id}': {
+    patch: {
+      tags: ['Rent Engine'],
+      summary: 'Update an unpaid rent charge',
+      description: 'Updates the due date, rent amount, and late fee. Paid and cancelled charges cannot be edited; the new total cannot be less than the amount already paid.',
+      security: [{ bearerAuth: [] }],
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                dueDate: { type: 'string', format: 'date' },
+                rentAmount: { type: 'number', exclusiveMinimum: 0 },
+                lateFee: { type: 'number', minimum: 0 },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        200: { description: 'Rent charge updated' },
+        400: { description: 'Invalid input or total is below the amount already paid' },
+        404: { description: 'Rent charge not found' },
+        409: { description: 'Paid or cancelled charges cannot be edited' },
+      },
+    },
+  },
   '/api/rent/generate-charges': {
     post: {
       tags: ['Rent Engine'],
