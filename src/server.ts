@@ -42,7 +42,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: 'https://rentbackend-git-62173407432.europe-west1.run.app',
+        url: 'https://renterapp.cloud.run/',
         description: 'Cloud Run Server',
       },
     ],
