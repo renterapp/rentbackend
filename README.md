@@ -62,3 +62,15 @@ relying on it for production billing.
 
 References: [Cloud Run container contract](https://cloud.google.com/run/docs/container-contract)
 and [deployment flags](https://cloud.google.com/sdk/gcloud/reference/run/deploy).
+
+## API documentation
+
+Swagger UI is served at `/api-docs/`. Its server URL points to the deployed Cloud
+Run API. Request schemas and route documentation live in `src/docs/swaggerPaths.ts`.
+After installing dependencies, validate documentation coverage with:
+
+```sh
+npm run prisma:generate
+npm run build
+node scripts/check-swagger.cjs
+```

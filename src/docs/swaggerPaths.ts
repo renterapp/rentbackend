@@ -338,16 +338,21 @@ export const swaggerPaths = {
           'application/json': {
             schema: {
               type: 'object',
-              required: ['apartmentNumber', 'buildingId'],
               properties: {
-                apartmentNumber: { type: 'string', example: '101' },
-                buildingId: { type: 'string' },
-                floorNumber: { type: 'integer', example: 1 },
-                bedroomCount: { type: 'integer', example: 2 },
-                bathroomCount: { type: 'integer', example: 2 },
-                monthlyRentAmount: { type: 'number', example: 15000 },
-                securityDepositAmount: { type: 'number', example: 30000 },
+                buildingId: { type: 'string', format: 'uuid' },
+                floorId: { type: 'string', format: 'uuid', nullable: true },
+                apartmentNumber: { type: 'string', minLength: 1 },
+                block: { type: 'string', nullable: true },
+                apartmentTypeId: { type: 'string', format: 'uuid', nullable: true },
+                bedrooms: { type: 'integer', nullable: true },
+                bathrooms: { type: 'integer', nullable: true },
+                areaSqft: { type: 'number', minimum: 0, exclusiveMinimum: true, nullable: true },
+                defaultRent: { type: 'number', minimum: 0 },
+                securityDeposit: { type: 'number', minimum: 0, nullable: true },
+                statusId: { type: 'string', format: 'uuid' },
+                notes: { type: 'string', nullable: true },
               },
+              required: ['buildingId', 'apartmentNumber'],
             },
           },
         },
@@ -366,6 +371,64 @@ export const swaggerPaths = {
       responses: {
         200: { description: 'Apartment details' },
         404: { description: 'Apartment not found' },
+      },
+    },
+    put: {
+      tags: ['Apartments'],
+      summary: 'Update apartment fields',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER, MANAGER, or ADMIN role. Accepts partial updates; the building cannot be changed.',
+      parameters: [{
+        name: 'id',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                floorId: { type: 'string', format: 'uuid', nullable: true },
+                apartmentNumber: { type: 'string', minLength: 1 },
+                block: { type: 'string', nullable: true },
+                apartmentTypeId: { type: 'string', format: 'uuid', nullable: true },
+                bedrooms: { type: 'integer', nullable: true },
+                bathrooms: { type: 'integer', nullable: true },
+                areaSqft: { type: 'number', minimum: 0, exclusiveMinimum: true, nullable: true },
+                defaultRent: { type: 'number', minimum: 0 },
+                securityDeposit: { type: 'number', minimum: 0, nullable: true },
+                statusId: { type: 'string', format: 'uuid' },
+                notes: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        200: { description: 'Update apartment fields' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+        400: { description: 'Invalid request data' },
+      },
+    },
+    delete: {
+      tags: ['Apartments'],
+      summary: 'Delete apartment',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER, MANAGER, or ADMIN role. Rejects apartments with an active lease. Also removes historical charges, payments, documents, maintenance, expenses, and leases.',
+      parameters: [{
+        name: 'id',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      }],
+      responses: {
+        200: { description: 'Delete apartment' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
       },
     },
   },
@@ -388,15 +451,20 @@ export const swaggerPaths = {
           'application/json': {
             schema: {
               type: 'object',
-              required: ['firstName', 'phone'],
               properties: {
-                firstName: { type: 'string', example: 'Ravi' },
-                lastName: { type: 'string', example: 'Kumar' },
-                email: { type: 'string', format: 'email', example: 'ravi@example.com' },
-                phone: { type: 'string', example: '+919123456789' },
-                idType: { type: 'string', example: 'AADHAAR' },
-                idNumber: { type: 'string', example: '1234-5678-9012' },
+                firstName: { type: 'string', minLength: 1 },
+                lastName: { type: 'string', nullable: true },
+                email: { type: 'string', format: 'email', nullable: true },
+                phone: { type: 'string', minLength: 5 },
+                dateOfBirth: { type: 'string', format: 'date', nullable: true },
+                emergencyContactName: { type: 'string', nullable: true },
+                emergencyContactPhone: { type: 'string', nullable: true },
+                address: { type: 'string', nullable: true },
+                governmentIdTypeId: { type: 'string', format: 'uuid', nullable: true },
+                governmentIdNumber: { type: 'string', nullable: true },
+                notes: { type: 'string', nullable: true },
               },
+              required: ['firstName', 'phone'],
             },
           },
         },
@@ -431,7 +499,7 @@ export const swaggerPaths = {
                 tenantId: { type: 'string', format: 'uuid' },
                 startDate: { type: 'string', format: 'date', example: '2026-01-01' },
                 endDate: { type: 'string', format: 'date', nullable: true, example: '2026-12-31' },
-                monthlyRent: { type: 'number', exclusiveMinimum: 0, example: 15000 },
+                monthlyRent: { type: 'number', minimum: 0, exclusiveMinimum: true, example: 15000 },
                 securityDeposit: { type: 'number', minimum: 0, example: 30000 },
                 rentDueDay: { type: 'integer', minimum: 1, maximum: 31, default: 5 },
                 lateFee: { type: 'number', minimum: 0, default: 0 },
@@ -466,7 +534,7 @@ export const swaggerPaths = {
               properties: {
                 startDate: { type: 'string', format: 'date' },
                 endDate: { type: 'string', format: 'date', nullable: true },
-                monthlyRent: { type: 'number', exclusiveMinimum: 0 },
+                monthlyRent: { type: 'number', minimum: 0, exclusiveMinimum: true },
                 securityDeposit: { type: 'number', minimum: 0 },
                 rentDueDay: { type: 'integer', minimum: 1, maximum: 31 },
                 lateFee: { type: 'number', minimum: 0 },
@@ -517,7 +585,7 @@ export const swaggerPaths = {
               type: 'object',
               properties: {
                 dueDate: { type: 'string', format: 'date' },
-                rentAmount: { type: 'number', exclusiveMinimum: 0 },
+                rentAmount: { type: 'number', minimum: 0, exclusiveMinimum: true },
                 lateFee: { type: 'number', minimum: 0 },
               },
             },
@@ -780,6 +848,29 @@ export const swaggerPaths = {
       },
     },
     post: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                propertyId: { type: 'string', format: 'uuid', nullable: true },
+                buildingId: { type: 'string', format: 'uuid', nullable: true },
+                apartmentId: { type: 'string', format: 'uuid', nullable: true },
+                categoryId: { type: 'string', format: 'uuid', nullable: true },
+                amount: { type: 'number', minimum: 0, exclusiveMinimum: true },
+                expenseDate: { type: 'string', format: 'date' },
+                vendorName: { type: 'string', maxLength: 200, nullable: true },
+                invoiceNumber: { type: 'string', maxLength: 100, nullable: true },
+                description: { type: 'string', nullable: true },
+              },
+              required: ['amount', 'expenseDate'],
+            },
+          },
+        },
+      },
       tags: ['Expense Management'],
       summary: 'Record an expense',
       security: [{ bearerAuth: [] }],
@@ -792,6 +883,7 @@ export const swaggerPaths = {
   },
   '/api/expenses/summary': {
     get: {
+      description: 'Optional UTC dates default to the first day of the current month through today. The inclusive date range must be 1 to 366 days.',
       tags: ['Expense Management'],
       summary: 'Get monthly, property, building, category, and maintenance expense totals',
       security: [{ bearerAuth: [] }],
@@ -817,6 +909,21 @@ export const swaggerPaths = {
       },
     },
     post: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', minLength: 2, maxLength: 100 },
+              },
+              required: ['name'],
+            },
+          },
+        },
+      },
       tags: ['Expense Management'],
       summary: 'Create an organization expense category',
       security: [{ bearerAuth: [] }],
@@ -828,6 +935,28 @@ export const swaggerPaths = {
   },
   '/api/expenses/{id}': {
     patch: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                propertyId: { type: 'string', format: 'uuid', nullable: true },
+                buildingId: { type: 'string', format: 'uuid', nullable: true },
+                apartmentId: { type: 'string', format: 'uuid', nullable: true },
+                categoryId: { type: 'string', format: 'uuid', nullable: true },
+                amount: { type: 'number', minimum: 0, exclusiveMinimum: true },
+                expenseDate: { type: 'string', format: 'date' },
+                vendorName: { type: 'string', maxLength: 200, nullable: true },
+                invoiceNumber: { type: 'string', maxLength: 100, nullable: true },
+                description: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+      },
       tags: ['Expense Management'],
       summary: 'Update an organization expense',
       security: [{ bearerAuth: [] }],
@@ -838,6 +967,7 @@ export const swaggerPaths = {
       },
     },
     delete: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
       tags: ['Expense Management'],
       summary: 'Delete an organization expense',
       security: [{ bearerAuth: [] }],
@@ -850,6 +980,21 @@ export const swaggerPaths = {
   },
   '/api/expenses/categories/{id}': {
     patch: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', minLength: 2, maxLength: 100 },
+              },
+              required: ['name'],
+            },
+          },
+        },
+      },
       tags: ['Expense Management'],
       summary: 'Rename an organization expense category',
       security: [{ bearerAuth: [] }],
@@ -860,6 +1005,7 @@ export const swaggerPaths = {
       },
     },
     delete: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
       tags: ['Expense Management'],
       summary: 'Deactivate an organization expense category',
       security: [{ bearerAuth: [] }],
@@ -899,6 +1045,7 @@ export const swaggerPaths = {
                 priorityCode: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY'], default: 'MEDIUM' },
                 title: { type: 'string', minLength: 3 },
                 description: { type: 'string', minLength: 5 },
+                estimatedCost: { type: 'number', minimum: 0 },
               },
             },
           },
@@ -1016,6 +1163,28 @@ export const swaggerPaths = {
   },
   '/api/notifications/announcements': {
     post: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                title: { type: 'string', minLength: 1, maxLength: 200 },
+                message: { type: 'string', minLength: 1, maxLength: 5000 },
+                recipientUserIds: {
+                  type: 'array',
+                  items: { type: 'string', format: 'uuid' },
+                  maxItems: 500,
+                  description: 'Omit to notify all active organization users.',
+                },
+              },
+              required: ['title', 'message'],
+            },
+          },
+        },
+      },
       tags: ['Notifications'],
       summary: 'Publish an in-app and push announcement',
       security: [{ bearerAuth: [] }],
@@ -1027,6 +1196,21 @@ export const swaggerPaths = {
   },
   '/api/notifications/push-tokens': {
     post: {
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                token: { type: 'string', minLength: 1, maxLength: 255, example: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]' },
+                deviceName: { type: 'string', maxLength: 100, nullable: true },
+              },
+              required: ['token'],
+            },
+          },
+        },
+      },
       tags: ['Notifications'],
       summary: 'Register an Expo push token for the authenticated user',
       security: [{ bearerAuth: [] }],
@@ -1036,6 +1220,20 @@ export const swaggerPaths = {
       },
     },
     delete: {
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                token: { type: 'string', minLength: 1, maxLength: 255 },
+              },
+              required: ['token'],
+            },
+          },
+        },
+      },
       tags: ['Notifications'],
       summary: 'Remove an Expo push token from the authenticated user',
       security: [{ bearerAuth: [] }],
@@ -1047,6 +1245,7 @@ export const swaggerPaths = {
   },
   '/api/reports/rent': {
     get: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role. Optional dates use YYYY-MM-DD in UTC, defaulting to the first day of the current month through today. Both endpoints of the range are inclusive; the range must be 1 to 366 days. Filters charges by due date; collected amounts include all allocations on those charges.',
       tags: ['Reports'],
       summary: 'Report expected, collected, outstanding, and overdue rent',
       security: [{ bearerAuth: [] }],
@@ -1062,6 +1261,7 @@ export const swaggerPaths = {
   },
   '/api/reports/tenant-payments': {
     get: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role. Optional dates use YYYY-MM-DD in UTC, defaulting to the first day of the current month through today. Both endpoints of the range are inclusive; the range must be 1 to 366 days.',
       tags: ['Reports'],
       summary: 'Report tenant payment history and receipts',
       security: [{ bearerAuth: [] }],
@@ -1078,6 +1278,7 @@ export const swaggerPaths = {
   },
   '/api/reports/occupancy': {
     get: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role. Optional dates use YYYY-MM-DD in UTC, defaulting to the first day of the current month through today. Both endpoints of the range are inclusive; the range must be 1 to 366 days. Occupancy and vacancies reflect today; the date range filters tenant turnover only.',
       tags: ['Reports'],
       summary: 'Report occupancy, vacancies, and tenant turnover',
       security: [{ bearerAuth: [] }],
@@ -1095,6 +1296,7 @@ export const swaggerPaths = {
   },
   '/api/reports/expenses': {
     get: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role. Optional dates use YYYY-MM-DD in UTC, defaulting to the first day of the current month through today. Both endpoints of the range are inclusive; the range must be 1 to 366 days.',
       tags: ['Reports'],
       summary: 'Report expenses by month, category, and property, including maintenance cost',
       security: [{ bearerAuth: [] }],
@@ -1110,6 +1312,7 @@ export const swaggerPaths = {
   },
   '/api/reports/maintenance': {
     get: {
+      description: 'Requires OWNER, MANAGER, or ADMIN role. Optional dates use YYYY-MM-DD in UTC, defaulting to the first day of the current month through today. Both endpoints of the range are inclusive; the range must be 1 to 366 days. Open request count is current; the date range filters completed requests only.',
       tags: ['Reports'],
       summary: 'Report open and completed maintenance requests, costs, and completion time',
       security: [{ bearerAuth: [] }],
@@ -1206,6 +1409,378 @@ export const swaggerPaths = {
       responses: {
         200: { description: 'Document deleted' },
         404: { description: 'Document not found' },
+      },
+    },
+  },
+  '/api/tenants/meta/id-types': {
+    get: {
+      tags: ['Tenants'],
+      summary: 'List active government ID types',
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: { description: 'List active government ID types' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+      },
+    },
+  },
+  '/api/tenants/{id}': {
+    get: {
+      tags: ['Tenants'],
+      summary: 'Get tenant details and lease history',
+      security: [{ bearerAuth: [] }],
+      parameters: [{
+        name: 'id',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      }],
+      responses: {
+        200: { description: 'Get tenant details and lease history' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+      },
+    },
+    patch: {
+      tags: ['Tenants'],
+      summary: 'Update tenant',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      parameters: [{
+        name: 'id',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                firstName: { type: 'string', minLength: 1 },
+                lastName: { type: 'string', nullable: true },
+                email: { type: 'string', format: 'email', nullable: true },
+                phone: { type: 'string', minLength: 5 },
+                dateOfBirth: { type: 'string', format: 'date', nullable: true },
+                emergencyContactName: { type: 'string', nullable: true },
+                emergencyContactPhone: { type: 'string', nullable: true },
+                address: { type: 'string', nullable: true },
+                governmentIdTypeId: { type: 'string', format: 'uuid', nullable: true },
+                governmentIdNumber: { type: 'string', nullable: true },
+                notes: { type: 'string', nullable: true },
+                status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        200: { description: 'Update tenant' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+        400: { description: 'Invalid request data' },
+      },
+    },
+    delete: {
+      tags: ['Tenants'],
+      summary: 'Delete tenant',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER, MANAGER, or ADMIN role. Rejects tenants with an active lease. Also removes associated payments, lease links, documents, and maintenance requests.',
+      parameters: [{
+        name: 'id',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      }],
+      responses: {
+        200: { description: 'Delete tenant' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+      },
+    },
+  },
+  '/api/tenants/leases': {
+    post: {
+      tags: ['Tenants'],
+      summary: 'Assign tenant to apartment and create lease',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              required: ['apartmentId', 'tenantId', 'startDate', 'monthlyRent'],
+              properties: {
+                apartmentId: { type: 'string', format: 'uuid' },
+                tenantId: { type: 'string', format: 'uuid' },
+                startDate: { type: 'string', format: 'date', example: '2026-01-01' },
+                endDate: { type: 'string', format: 'date', nullable: true, example: '2026-12-31' },
+                monthlyRent: { type: 'number', minimum: 0, exclusiveMinimum: true, example: 15000 },
+                securityDeposit: { type: 'number', minimum: 0, example: 30000 },
+                rentDueDay: { type: 'integer', minimum: 1, maximum: 31, default: 5 },
+                lateFee: { type: 'number', minimum: 0, default: 0 },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        201: { description: 'Assign tenant to apartment and create lease' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+      },
+    },
+  },
+  '/api/apartments/meta/lookups': {
+    get: {
+      tags: ['Apartments'],
+      summary: 'List active apartment types and statuses',
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: { description: 'List active apartment types and statuses' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+      },
+    },
+  },
+  '/api/apartments/bulk-generate': {
+    post: {
+      tags: ['Apartments'],
+      summary: 'Generate apartments and missing floors',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER, MANAGER, or ADMIN role. Existing apartment numbers are skipped.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                buildingId: { type: 'string', format: 'uuid' },
+                floorsCount: { type: 'integer', minimum: 1, maximum: 100 },
+                apartmentsPerFloor: { type: 'integer', minimum: 1, maximum: 100 },
+                startingFloor: { type: 'integer', default: 1 },
+                prefix: { type: 'string', default: '' },
+                defaultRent: { type: 'number', minimum: 0, default: 15000 },
+                securityDeposit: { type: 'number', minimum: 0, default: 30000 },
+                apartmentTypeId: { type: 'string', format: 'uuid', nullable: true },
+              },
+              required: ['buildingId', 'floorsCount', 'apartmentsPerFloor'],
+            },
+          },
+        },
+      },
+      responses: {
+        201: { description: 'Generate apartments and missing floors' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+        400: { description: 'Invalid request data' },
+      },
+    },
+  },
+  '/api/apartments/bulk-preview': {
+    post: {
+      tags: ['Apartments'],
+      summary: 'Preview generated apartment numbers',
+      security: [{ bearerAuth: [] }],
+      description: 'Returns a preview without creating records.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                buildingId: { type: 'string', format: 'uuid' },
+                floorsCount: { type: 'integer', minimum: 1, maximum: 100 },
+                apartmentsPerFloor: { type: 'integer', minimum: 1, maximum: 100 },
+                startingFloor: { type: 'integer', default: 1 },
+                prefix: { type: 'string', default: '' },
+                defaultRent: { type: 'number', minimum: 0, default: 15000 },
+                securityDeposit: { type: 'number', minimum: 0, default: 30000 },
+                apartmentTypeId: { type: 'string', format: 'uuid', nullable: true },
+              },
+              required: ['buildingId', 'floorsCount', 'apartmentsPerFloor'],
+            },
+          },
+        },
+      },
+      responses: {
+        200: { description: 'Preview generated apartment numbers' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+        400: { description: 'Invalid request data' },
+      },
+    },
+  },
+  '/api/rent/meta/lookups': {
+    get: {
+      tags: ['Rent Engine'],
+      summary: 'List rent statuses and payment methods',
+      security: [{ bearerAuth: [] }],
+      responses: {
+        200: { description: 'List rent statuses and payment methods' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+      },
+    },
+  },
+  '/api/auth/users/{userId}/status': {
+    patch: {
+      tags: ['Auth'],
+      summary: 'Activate, deactivate, or suspend an organization user',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER or ADMIN role.',
+      parameters: [{
+        name: 'userId',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                status: { type: 'string', enum: ['ACTIVE', 'INACTIVE', 'SUSPENDED'] },
+              },
+              required: ['status'],
+            },
+          },
+        },
+      },
+      responses: {
+        200: { description: 'Activate, deactivate, or suspend an organization user' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+        400: { description: 'Invalid request data' },
+      },
+    },
+  },
+  '/api/properties/buildings/{buildingId}/floors': {
+    get: {
+      tags: ['Properties'],
+      summary: 'List floors for a building',
+      security: [{ bearerAuth: [] }],
+      parameters: [{
+        name: 'buildingId',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      }],
+      responses: {
+        200: { description: 'List floors for a building' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+      },
+    },
+  },
+  '/api/maintenance/{id}/assign': {
+    post: {
+      tags: ['Maintenance'],
+      summary: 'Assign a worker to a maintenance request',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      parameters: [{
+        name: 'id',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                workerId: { type: 'string', format: 'uuid' },
+                notes: { type: 'string' },
+              },
+              required: ['workerId'],
+            },
+          },
+        },
+      },
+      responses: {
+        200: { description: 'Assign a worker to a maintenance request' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+        400: { description: 'Invalid request data' },
+      },
+    },
+  },
+  '/api/maintenance/{id}/status': {
+    patch: {
+      tags: ['Maintenance'],
+      summary: 'Update maintenance status and actual cost',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      parameters: [{
+        name: 'id',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      }],
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                statusCode: { type: 'string', enum: ['SUBMITTED', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_FOR_PARTS', 'COMPLETED', 'CANCELLED'] },
+                comment: { type: 'string' },
+                actualCost: { type: 'number', minimum: 0 },
+              },
+              required: ['statusCode'],
+            },
+          },
+        },
+      },
+      responses: {
+        200: { description: 'Update maintenance status and actual cost' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+        400: { description: 'Invalid request data' },
+      },
+    },
+  },
+  '/api/maintenance/workers': {
+    post: {
+      tags: ['Maintenance'],
+      summary: 'Create a maintenance worker',
+      security: [{ bearerAuth: [] }],
+      description: 'Requires OWNER, MANAGER, or ADMIN role.',
+      requestBody: {
+        required: true,
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                workerName: { type: 'string', minLength: 2 },
+                workerPhone: { type: 'string', minLength: 5 },
+                workerType: { type: 'string', minLength: 2, example: 'Electrician' },
+                email: { type: 'string', format: 'email', nullable: true },
+                companyName: { type: 'string', nullable: true },
+              },
+              required: ['workerName', 'workerPhone', 'workerType'],
+            },
+          },
+        },
+      },
+      responses: {
+        201: { description: 'Create a maintenance worker' },
+        401: { description: 'Unauthorized' },
+        500: { description: 'Server error' },
+        400: { description: 'Invalid request data' },
       },
     },
   },
