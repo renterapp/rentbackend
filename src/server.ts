@@ -42,8 +42,8 @@ const swaggerOptions: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: `http://localhost:${PORT}`,
-        description: 'Development Server',
+        url: 'https://rentbackend-git-62173407432.europe-west1.run.app',
+        description: 'Cloud Run Server',
       },
     ],
     components: {
