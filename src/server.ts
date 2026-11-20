@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { prisma } from './lib/prisma';
@@ -25,11 +25,17 @@ import maintenanceRouter from './routes/maintenance';
 
 dotenv.config();
 
-const app = express();
+export const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+app.use((error: any, _req: Request, res: Response, next: NextFunction) => {
+  if (error?.type === 'entity.parse.failed' && error.status === 400) {
+    return res.status(400).json({ error: 'Invalid JSON request body' });
+  }
+  next(error);
+});
 
 // Swagger configuration
 const swaggerOptions: swaggerJsdoc.Options = {
@@ -142,8 +148,10 @@ app.get('/', (req: Request, res: Response) => {
 
 import { RentScheduler } from './services/scheduler';
 
-app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
-  console.log(`Swagger documentation available at http://localhost:${PORT}/api-docs`);
-  RentScheduler.start();
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Backend server running on http://localhost:${PORT}`);
+    console.log(`Swagger documentation available at http://localhost:${PORT}/api-docs`);
+    RentScheduler.start();
+  });
+}
